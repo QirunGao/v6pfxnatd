@@ -1,0 +1,10 @@
+build/
+dist/
+.gocache/
+.idea/
+docs/
+*.exe
+*.test
+*.out
+coverage.txt
+*.log

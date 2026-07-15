@@ -1,0 +1,26 @@
+[network]
+wan_interface = "ppp-wan1"
+policy_route_table = 1001
+pd_route_table = 254
+
+[delegated_prefix]
+prefix_length = 56
+route_protocol = 16
+route_type = 7
+
+[nftables]
+table_name = "v6pfxnat_wan1"
+
+[[mappings]]
+name = "vlan10"
+inside_prefix = "fdff:a887:86e4:10::/64"
+subnet_id = 0x10
+
+[[mappings]]
+name = "vlan20"
+inside_prefix = "fdff:a887:86e4:20::/64"
+subnet_id = 0x20
+
+[logging]
+level = "info"
+format = "text"
