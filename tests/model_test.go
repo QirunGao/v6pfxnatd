@@ -63,6 +63,11 @@ func TestDesiredSpecFingerprintAndCurrentComparison(t *testing.T) {
 	pd, _ := SelectDelegatedPrefix(snapshot)
 	mappings := DeriveMappings(cfg, pd)
 	spec := BuildDesiredSpec(cfg, pd, mappings)
+	for _, item := range spec.Maps {
+		if item.DataType != "interval ipv6_addr" {
+			t.Fatalf("map %s data type = %q, want interval ipv6_addr", item.Name, item.DataType)
+		}
+	}
 	artifact := DesiredArtifact{Spec: spec, Fingerprint: FingerprintDesiredSpec(spec)}
 	if artifact.Fingerprint != FingerprintDesiredSpec(spec) {
 		t.Fatal("fingerprint is not deterministic")
@@ -77,7 +82,7 @@ func TestDesiredSpecFingerprintAndCurrentComparison(t *testing.T) {
 	if !IsCurrent(current, artifact) {
 		t.Fatal("equivalent current table was not recognized")
 	}
-	current.SNATComment = "v6pfxnatd:v2:other"
+	current.SNATComment = "v6pfxnatd:other"
 	if IsCurrent(current, artifact) {
 		t.Fatal("table with different fingerprint was recognized as current")
 	}

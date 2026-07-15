@@ -106,10 +106,11 @@ func BuildReplacement(conn *nftables.Conn, current CurrentTable, desired Desired
 
 	metadata := MetadataFor(desired)
 	maps := make(map[string]*nftables.Set, len(desired.Spec.Maps))
+	dataType := prefixMapDataType()
 	for _, item := range desired.Spec.Maps {
 		set := &nftables.Set{
 			Table: table, Name: item.Name, IsMap: true, Constant: item.Constant, Interval: item.Interval,
-			KeyType: nftables.TypeIP6Addr, DataType: nftables.TypeIP6Addr, Comment: metadata,
+			KeyType: nftables.TypeIP6Addr, DataType: dataType, Comment: metadata,
 		}
 		elements := EncodeMapElements(item.Elements)
 		if err := conn.AddSet(set, elements); err != nil {
@@ -121,13 +122,19 @@ func BuildReplacement(conn *nftables.Conn, current CurrentTable, desired Desired
 	for _, rule := range desired.Spec.Rules {
 		chain := chains[rule.Chain]
 		set := maps[rule.MapName]
-		conn.AddRule(&nftables.Rule{Table: table, Chain: chain, Exprs: encodeRuleExpressions(rule, set)})
+		conn.AddRule(&nftables.Rule{Table: table, Chain: chain, Exprs: EncodeRuleExpressions(rule, set)})
 	}
 	return nil
 }
 
 func CommitReplacement(conn *nftables.Conn) error {
 	return conn.Flush()
+}
+
+func prefixMapDataType() nftables.SetDatatype {
+	dataType := nftables.TypeIP6Addr
+	dataType.Bytes *= 2
+	return dataType
 }
 
 func EncodeMapElements(items []MapElementSpec) []nftables.SetElement {
@@ -143,10 +150,14 @@ func EncodeMapElements(items []MapElementSpec) []nftables.SetElement {
 	for i, element := range items {
 		key := element.Key.Addr().As16()
 		value := element.Value.Addr().As16()
+		valueEnd := prefixLast64(value)
+		encodedValue := make([]byte, 32)
+		copy(encodedValue, value[:])
+		copy(encodedValue[16:], valueEnd[:])
 		end := prefixEnd64(key)
 		encoded = append(encoded, nftables.SetElement{
 			Key: append([]byte(nil), key[:]...),
-			Val: append([]byte(nil), value[:]...),
+			Val: encodedValue,
 		})
 		if end == zero {
 			continue
@@ -239,7 +250,13 @@ func prefixEnd64(start [16]byte) [16]byte {
 	return end
 }
 
-func encodeRuleExpressions(rule RuleSpec, set *nftables.Set) []expr.Any {
+func prefixLast64(start [16]byte) [16]byte {
+	last := start
+	binary.BigEndian.PutUint64(last[8:], ^uint64(0))
+	return last
+}
+
+func EncodeRuleExpressions(rule RuleSpec, set *nftables.Set) []expr.Any {
 	interfaceData := make([]byte, unix.IFNAMSIZ)
 	copy(interfaceData, rule.InterfaceName)
 	metaKey := expr.MetaKeyIIFNAME
@@ -255,6 +272,6 @@ func encodeRuleExpressions(rule RuleSpec, set *nftables.Set) []expr.Any {
 		&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: interfaceData},
 		&expr.Payload{DestRegister: 1, Base: expr.PayloadBaseNetworkHeader, Offset: rule.AddressOffset, Len: 16},
 		&expr.Lookup{SourceRegister: 1, DestRegister: 1, IsDestRegSet: true, SetName: set.Name, SetID: set.ID},
-		&expr.NAT{Type: natType, Family: unix.NFPROTO_IPV6, RegAddrMin: 1, Prefix: true},
+		&expr.NAT{Type: natType, Family: unix.NFPROTO_IPV6, RegAddrMin: 1, RegAddrMax: 2, Prefix: true},
 	}
 }

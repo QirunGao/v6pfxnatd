@@ -5,6 +5,10 @@ whose public prefix changes with DHCPv6-PD. It watches IPv6 route changes,
 derives the configured public `/64` mappings, and atomically replaces only its
 own nftables NAT table when the desired state changes.
 
+Each mapping replaces only the high 64-bit network prefix. The low 64-bit
+interface identifier is preserved in both directions, for example
+`fdff:a887:86e4:10::1234` maps to `2001:db8:1234:5610::1234`.
+
 The daemon does not manage firewall filter policy, persist runtime state, call
 the `ip` or `nft` commands, or modify conntrack state. Existing `input` and
 `forward` chains remain the administrator's responsibility.
@@ -14,7 +18,7 @@ the `ip` or `nft` commands, or modify conntrack state. Existing `input` and
 Download a package from GitHub Releases and install it:
 
 ```sh
-sudo apt install ./v6pfxnatd_0.2.0_amd64.deb
+sudo apt install ./v6pfxnatd_0.2.1_amd64.deb
 sudoedit /etc/v6pfxnatd/config.toml
 sudo systemctl enable --now v6pfxnatd.service
 ```

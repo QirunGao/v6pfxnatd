@@ -10,8 +10,6 @@ import (
 	"sort"
 )
 
-const SchemaVersion uint32 = 2
-
 const (
 	managedFamily        = "ip6"
 	preroutingChainName  = "prerouting"
@@ -32,8 +30,6 @@ type PrefixMapping struct {
 }
 
 type DesiredSpec struct {
-	SchemaVersion uint32
-
 	Family    string
 	TableName string
 
@@ -120,7 +116,6 @@ func BuildDesiredSpec(cfg NormalizedConfig, delegatedPrefix netip.Prefix, mappin
 	SortMapElements(snatElements)
 
 	return DesiredSpec{
-		SchemaVersion:   SchemaVersion,
 		Family:          managedFamily,
 		TableName:       cfg.NFTTableName,
 		WANInterface:    cfg.WANInterface,
@@ -130,8 +125,8 @@ func BuildDesiredSpec(cfg NormalizedConfig, delegatedPrefix netip.Prefix, mappin
 			{Name: postroutingChainName, Type: "nat", Hook: "postrouting", Priority: 100, Policy: "accept"},
 		},
 		Maps: []MapSpec{
-			{Name: dnatMapName, KeyType: "ipv6_addr", DataType: "ipv6_addr", Constant: true, Interval: true, Elements: dnatElements},
-			{Name: snatMapName, KeyType: "ipv6_addr", DataType: "ipv6_addr", Constant: true, Interval: true, Elements: snatElements},
+			{Name: dnatMapName, KeyType: "ipv6_addr", DataType: "interval ipv6_addr", Constant: true, Interval: true, Elements: dnatElements},
+			{Name: snatMapName, KeyType: "ipv6_addr", DataType: "interval ipv6_addr", Constant: true, Interval: true, Elements: snatElements},
 		},
 		Rules: []RuleSpec{
 			{Chain: preroutingChainName, InterfaceKey: "iifname", InterfaceName: cfg.WANInterface, MapName: dnatMapName, AddressOffset: 24, NATType: "dnat"},
@@ -143,7 +138,6 @@ func BuildDesiredSpec(cfg NormalizedConfig, delegatedPrefix netip.Prefix, mappin
 
 func FingerprintDesiredSpec(desired DesiredSpec) [32]byte {
 	var buffer bytes.Buffer
-	writeUint32(&buffer, desired.SchemaVersion)
 	writeString(&buffer, desired.Family)
 	writeString(&buffer, desired.TableName)
 	writeString(&buffer, desired.WANInterface)
@@ -189,7 +183,7 @@ func FingerprintDesiredSpec(desired DesiredSpec) [32]byte {
 }
 
 func MetadataFor(desired DesiredArtifact) string {
-	return fmt.Sprintf("v6pfxnatd:v%d:%s", desired.Spec.SchemaVersion, hex.EncodeToString(desired.Fingerprint[:]))
+	return fmt.Sprintf("v6pfxnatd:%s", hex.EncodeToString(desired.Fingerprint[:]))
 }
 
 func IsCurrent(current CurrentTable, desired DesiredArtifact) bool {
