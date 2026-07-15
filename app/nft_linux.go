@@ -1,6 +1,6 @@
 //go:build linux
 
-package main
+package app
 
 import (
 	"bytes"
@@ -104,14 +104,14 @@ func BuildReplacement(conn *nftables.Conn, current CurrentTable, desired Desired
 		}),
 	}
 
-	metadata := metadataFor(desired)
+	metadata := MetadataFor(desired)
 	maps := make(map[string]*nftables.Set, len(desired.Spec.Maps))
 	for _, item := range desired.Spec.Maps {
 		set := &nftables.Set{
 			Table: table, Name: item.Name, IsMap: true, Constant: item.Constant, Interval: item.Interval,
 			KeyType: nftables.TypeIP6Addr, DataType: nftables.TypeIP6Addr, Comment: metadata,
 		}
-		elements := encodeMapElements(item.Elements)
+		elements := EncodeMapElements(item.Elements)
 		if err := conn.AddSet(set, elements); err != nil {
 			return fmt.Errorf("add map %q: %w", item.Name, err)
 		}
@@ -130,7 +130,7 @@ func CommitReplacement(conn *nftables.Conn) error {
 	return conn.Flush()
 }
 
-func encodeMapElements(items []MapElementSpec) []nftables.SetElement {
+func EncodeMapElements(items []MapElementSpec) []nftables.SetElement {
 	if len(items) == 0 {
 		return nil
 	}
@@ -205,14 +205,14 @@ func readManagedSetComments(tableName string) (map[string]string, error) {
 			return nil, err
 		}
 		if table == tableName && (name == dnatMapName || name == snatMapName) {
-			comment, _ := decodeSetComment(rawUserData)
+			comment, _ := DecodeSetComment(rawUserData)
 			comments[name] = comment
 		}
 	}
 	return comments, nil
 }
 
-func decodeSetComment(data []byte) (string, error) {
+func DecodeSetComment(data []byte) (string, error) {
 	for len(data) != 0 {
 		if len(data) < 2 {
 			return "", errors.New("malformed nftables set userdata")

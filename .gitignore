@@ -1,10 +1,14 @@
-build/
-dist/
-.gocache/
-.idea/
-docs/
+# Build outputs
+/build/
+/dist/
 *.exe
 *.test
 *.out
-coverage.txt
+
+# Test outputs
+/coverage.txt
+/coverage.*
 *.log
+
+# Go cache
+/.gocache/

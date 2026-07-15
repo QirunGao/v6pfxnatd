@@ -1,4 +1,4 @@
-package main
+package tests
 
 import (
 	"fmt"
@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"v6pfxnatd/app"
 )
 
 var blackBoxBinary string
@@ -24,7 +26,7 @@ func TestMain(m *testing.M) {
 		name += ".exe"
 	}
 	blackBoxBinary = filepath.Join(dir, name)
-	cmd := exec.Command("go", "build", "-o", blackBoxBinary, ".")
+	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", blackBoxBinary, "../cmd/v6pfxnatd")
 	cmd.Env = append(os.Environ(), "GOCACHE="+filepath.Join(dir, "gocache"))
 	if output, err := cmd.CombinedOutput(); err != nil {
 		fmt.Fprintf(os.Stderr, "black-box build failed: %v\n%s", err, output)
@@ -45,7 +47,7 @@ func TestBlackBoxVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("command failed: %v: %s", err, output)
 	}
-	if strings.TrimSpace(string(output)) != version {
+	if strings.TrimSpace(string(output)) != app.Version {
 		t.Fatalf("output = %q", output)
 	}
 }

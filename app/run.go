@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -6,14 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 const (
 	defaultConfigPath = "/etc/v6pfxnatd/config.toml"
-	version           = "0.1.0"
+	Version           = "0.2.0"
 )
 
 type cliOptions struct {
@@ -21,13 +18,7 @@ type cliOptions struct {
 	version    bool
 }
 
-func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	os.Exit(run(ctx, os.Args[1:], os.Stdout, os.Stderr))
-}
-
-func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+func RunCLI(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	opts, err := parseCLI(args, stderr)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -35,7 +26,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if opts.version {
-		fmt.Fprintln(stdout, version)
+		fmt.Fprintln(stdout, Version)
 		return 0
 	}
 
@@ -46,7 +37,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	logger := newLogger(cfg.Logging, stdout)
 	slog.SetDefault(logger)
-	logger.Info("service started", "version", version)
+	logger.Info("service started", "version", Version)
 	if err := Run(ctx, cfg); err != nil {
 		logger.Error("service stopped", "error", err)
 		return 1

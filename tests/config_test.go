@@ -1,10 +1,12 @@
-package main
+package tests
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	. "v6pfxnatd/app"
 )
 
 func TestLoadConfigValidatesAndNormalizes(t *testing.T) {
@@ -22,7 +24,7 @@ func TestLoadConfigValidatesAndNormalizes(t *testing.T) {
 }
 
 func TestExampleConfigLoads(t *testing.T) {
-	path, err := filepath.Abs("config.example.toml")
+	path, err := filepath.Abs("../release/config.example.toml")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -7,10 +7,10 @@ import (
 	"log/slog"
 )
 
-var (
-	watchIPv6Routes = WatchIPv6Routes
-	reconcileNow    = Reconcile
-)
+type RuntimeDependencies struct {
+	WatchIPv6Routes func(context.Context, NormalizedConfig, chan<- struct{}, chan<- struct{}) error
+	Reconcile       func(context.Context, NormalizedConfig) error
+}
 
 func Trigger(triggers chan<- struct{}) {
 	select {
@@ -20,12 +20,19 @@ func Trigger(triggers chan<- struct{}) {
 }
 
 func Run(ctx context.Context, cfg NormalizedConfig) error {
+	return RunWithDependencies(ctx, cfg, RuntimeDependencies{
+		WatchIPv6Routes: WatchIPv6Routes,
+		Reconcile:       Reconcile,
+	})
+}
+
+func RunWithDependencies(ctx context.Context, cfg NormalizedConfig, deps RuntimeDependencies) error {
 	triggers := make(chan struct{}, 1)
 	watcherReady := make(chan struct{})
 	watcherDone := make(chan error, 1)
 
 	go func() {
-		watcherDone <- watchIPv6Routes(ctx, cfg, watcherReady, triggers)
+		watcherDone <- deps.WatchIPv6Routes(ctx, cfg, watcherReady, triggers)
 	}()
 
 	select {
@@ -63,7 +70,7 @@ func Run(ctx context.Context, cfg NormalizedConfig) error {
 			if ctx.Err() != nil {
 				return nil
 			}
-			if err := reconcileNow(ctx, cfg); err != nil {
+			if err := deps.Reconcile(ctx, cfg); err != nil {
 				if ctx.Err() != nil {
 					return nil
 				}

@@ -1,8 +1,10 @@
-package main
+package tests
 
 import (
 	"net/netip"
 	"testing"
+
+	. "v6pfxnatd/app"
 )
 
 func TestSelectDelegatedPrefixRequiresExactlyOne(t *testing.T) {
@@ -49,7 +51,7 @@ func TestSortMapElementsUsesNumericAddressOrder(t *testing.T) {
 		{Key: netip.MustParsePrefix("2001:db8:0:10::/64"), Value: netip.MustParsePrefix("fd00:0:0:10::/64")},
 		{Key: netip.MustParsePrefix("2001:db8:0:2::/64"), Value: netip.MustParsePrefix("fd00:0:0:2::/64")},
 	}
-	sortMapElements(elements)
+	SortMapElements(elements)
 	if got, want := elements[0].Key, netip.MustParsePrefix("2001:db8:0:2::/64"); got != want {
 		t.Fatalf("first key = %s, want %s", got, want)
 	}
@@ -82,7 +84,7 @@ func TestDesiredSpecFingerprintAndCurrentComparison(t *testing.T) {
 }
 
 func currentFromDesired(desired DesiredArtifact) CurrentTable {
-	metadata := metadataFor(desired)
+	metadata := MetadataFor(desired)
 	return CurrentTable{
 		Exists:      true,
 		DNATComment: metadata,

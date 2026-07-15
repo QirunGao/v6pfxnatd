@@ -9,7 +9,7 @@ before:
 
 builds:
   - id: daemon
-    main: .
+    main: ./cmd/v6pfxnatd
     binary: v6pfxnatd
 
     goos:
@@ -41,7 +41,9 @@ nfpms:
     bindir: /usr/sbin
 
     maintainer: "GQR <noreply@gaoqirun.com>"
+    homepage: "https://github.com/QirunGao/v6pfxnatd"
     description: "Event-driven nftables IPv6 prefix NAT reconciler for dynamic DHCPv6-PD"
+    license: "Apache-2.0"
     section: admin
     priority: optional
     vendor: "v6pfxnatd"
@@ -61,32 +63,35 @@ nfpms:
       - src: ./README.md
         dst: /usr/share/doc/v6pfxnatd/README.md
 
-      - src: ./config.example.toml
+      - src: ./LICENSE
+        dst: /usr/share/doc/v6pfxnatd/LICENSE
+
+      - src: ./release/config.example.toml
         dst: /etc/v6pfxnatd/config.toml
         type: config|noreplace
         file_info:
           mode: 0600
 
-      - src: ./v6pfxnatd.service
+      - src: ./release/v6pfxnatd.service
         dst: /lib/systemd/system/v6pfxnatd.service
         packager: deb
         file_info:
           mode: 0644
 
-      - src: ./v6pfxnatd.service
+      - src: ./release/v6pfxnatd.service
         dst: /usr/lib/systemd/system/v6pfxnatd.service
         packager: rpm
         file_info:
           mode: 0644
 
-      - src: ./v6pfxnatd.conf
+      - src: ./release/v6pfxnatd.conf
         dst: /etc/modules-load.d/v6pfxnatd.conf
         file_info:
           mode: 0644
 
     scripts:
-      postinstall: ./scripts/package/postinst
-      postremove: ./scripts/package/postrm
+      postinstall: ./release/postinst
+      postremove: ./release/postrm
 
 checksum:
   name_template: checksums.txt

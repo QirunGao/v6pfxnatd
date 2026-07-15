@@ -1,6 +1,6 @@
 //go:build linux
 
-package main
+package tests
 
 import (
 	"net/netip"
@@ -9,6 +9,7 @@ import (
 	"github.com/google/nftables"
 	"github.com/google/nftables/userdata"
 	"github.com/mdlayher/netlink"
+	. "v6pfxnatd/app"
 )
 
 func TestReplacementIsBufferedAndSubmittedAsOneBatch(t *testing.T) {
@@ -46,7 +47,7 @@ func TestIntervalMapElementEncoding(t *testing.T) {
 		Key:   netip.MustParsePrefix("2001:db8:1234:5610::/64"),
 		Value: netip.MustParsePrefix("fdff:a887:86e4:10::/64"),
 	}
-	encoded := encodeMapElements([]MapElementSpec{element})
+	encoded := EncodeMapElements([]MapElementSpec{element})
 	if len(encoded) != 3 || !encoded[0].IntervalEnd || encoded[1].IntervalEnd || !encoded[2].IntervalEnd || len(encoded[1].Val) != 16 || len(encoded[2].Val) != 0 {
 		t.Fatalf("encoded interval = %+v", encoded)
 	}
@@ -57,8 +58,8 @@ func TestAdjacentIntervalMapElementEncoding(t *testing.T) {
 		{Key: netip.MustParsePrefix("2001:db8:1234:5611::/64"), Value: netip.MustParsePrefix("fdff:a887:86e4:11::/64")},
 		{Key: netip.MustParsePrefix("2001:db8:1234:5610::/64"), Value: netip.MustParsePrefix("fdff:a887:86e4:10::/64")},
 	}
-	sortMapElements(elements)
-	encoded := encodeMapElements(elements)
+	SortMapElements(elements)
+	encoded := EncodeMapElements(elements)
 	if len(encoded) != 4 || !encoded[0].IntervalEnd || encoded[1].IntervalEnd || encoded[2].IntervalEnd || !encoded[3].IntervalEnd {
 		t.Fatalf("encoded adjacent intervals = %+v", encoded)
 	}
@@ -69,8 +70,8 @@ func TestIntervalMapElementEncodingAcrossAddressSpaceBoundary(t *testing.T) {
 		{Key: netip.MustParsePrefix("::/64"), Value: netip.MustParsePrefix("fdff:a887:86e4:10::/64")},
 		{Key: netip.MustParsePrefix("ffff:ffff:ffff:ffff::/64"), Value: netip.MustParsePrefix("fdff:a887:86e4:20::/64")},
 	}
-	sortMapElements(elements)
-	encoded := encodeMapElements(elements)
+	SortMapElements(elements)
+	encoded := EncodeMapElements(elements)
 	if len(encoded) != 3 {
 		t.Fatalf("encoded boundary intervals = %+v", encoded)
 	}
@@ -81,7 +82,7 @@ func TestIntervalMapElementEncodingAtFinalPrefix(t *testing.T) {
 		Key:   netip.MustParsePrefix("ffff:ffff:ffff:ffff::/64"),
 		Value: netip.MustParsePrefix("fdff:a887:86e4:20::/64"),
 	}
-	encoded := encodeMapElements([]MapElementSpec{element})
+	encoded := EncodeMapElements([]MapElementSpec{element})
 	if len(encoded) != 2 || !encoded[0].IntervalEnd || encoded[1].IntervalEnd {
 		t.Fatalf("encoded final interval = %+v", encoded)
 	}
@@ -90,14 +91,14 @@ func TestIntervalMapElementEncodingAtFinalPrefix(t *testing.T) {
 func TestDecodeSetComment(t *testing.T) {
 	data := userdata.AppendUint32(nil, userdata.NFTNL_UDATA_SET_KEYBYTEORDER, 2)
 	data = userdata.AppendString(data, userdata.NFTNL_UDATA_SET_COMMENT, "v6pfxnatd:v2:test")
-	comment, err := decodeSetComment(data)
+	comment, err := DecodeSetComment(data)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if comment != "v6pfxnatd:v2:test" {
 		t.Fatalf("comment = %q", comment)
 	}
-	if _, err := decodeSetComment([]byte{byte(userdata.NFTNL_UDATA_SET_COMMENT), 10, 'x'}); err == nil {
+	if _, err := DecodeSetComment([]byte{byte(userdata.NFTNL_UDATA_SET_COMMENT), 10, 'x'}); err == nil {
 		t.Fatal("malformed userdata accepted")
 	}
 }

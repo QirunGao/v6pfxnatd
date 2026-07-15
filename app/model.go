@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"bytes"
@@ -116,8 +116,8 @@ func BuildDesiredSpec(cfg NormalizedConfig, delegatedPrefix netip.Prefix, mappin
 		dnatElements = append(dnatElements, MapElementSpec{Key: mapping.Outside, Value: mapping.Inside})
 		snatElements = append(snatElements, MapElementSpec{Key: mapping.Inside, Value: mapping.Outside})
 	}
-	sortMapElements(dnatElements)
-	sortMapElements(snatElements)
+	SortMapElements(dnatElements)
+	SortMapElements(snatElements)
 
 	return DesiredSpec{
 		SchemaVersion:   SchemaVersion,
@@ -188,7 +188,7 @@ func FingerprintDesiredSpec(desired DesiredSpec) [32]byte {
 	return sha256.Sum256(buffer.Bytes())
 }
 
-func metadataFor(desired DesiredArtifact) string {
+func MetadataFor(desired DesiredArtifact) string {
 	return fmt.Sprintf("v6pfxnatd:v%d:%s", desired.Spec.SchemaVersion, hex.EncodeToString(desired.Fingerprint[:]))
 }
 
@@ -196,11 +196,11 @@ func IsCurrent(current CurrentTable, desired DesiredArtifact) bool {
 	if !current.Exists {
 		return false
 	}
-	metadata := metadataFor(desired)
+	metadata := MetadataFor(desired)
 	return current.DNATComment == metadata && current.SNATComment == metadata
 }
 
-func sortMapElements(elements []MapElementSpec) {
+func SortMapElements(elements []MapElementSpec) {
 	sort.Slice(elements, func(i, j int) bool {
 		return elements[i].Key.Addr().Compare(elements[j].Key.Addr()) < 0
 	})
