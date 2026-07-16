@@ -46,6 +46,20 @@ func TestDeriveMappingsSupportsZeroLengthPD(t *testing.T) {
 	}
 }
 
+func TestBuildOperationalStatus(t *testing.T) {
+	cfg := testNormalizedConfig(t)
+	mappings := DeriveMappings(cfg, netip.MustParsePrefix("2001:db8:1234:5600::/56"))
+	status := BuildOperationalStatus(cfg, mappings)
+	want := "" +
+		"mapping fdff:a887:86e4:10::/64 2001:db8:1234:5610::/64\n" +
+		"mapping fdff:a887:86e4:20::/64 2001:db8:1234:5620::/64\n" +
+		"address dns-53 2001:db8:1234:5610::53\n" +
+		"address gateway-c 2001:db8:1234:5620::c\n"
+	if string(status) != want {
+		t.Fatalf("status = %q, want %q", status, want)
+	}
+}
+
 func TestSortMapElementsUsesNumericAddressOrder(t *testing.T) {
 	elements := []MapElementSpec{
 		{Key: netip.MustParsePrefix("2001:db8:0:10::/64"), Value: netip.MustParsePrefix("fd00:0:0:10::/64")},
@@ -69,13 +83,20 @@ func TestDesiredSpecFingerprintAndCurrentComparison(t *testing.T) {
 		}
 	}
 	artifact := DesiredArtifact{Spec: spec, Fingerprint: FingerprintDesiredSpec(spec)}
-	if artifact.Fingerprint != FingerprintDesiredSpec(spec) {
-		t.Fatal("fingerprint is not deterministic")
-	}
 	changed := spec
 	changed.WANInterface = "other"
 	if artifact.Fingerprint == FingerprintDesiredSpec(changed) {
 		t.Fatal("fingerprint ignored WAN interface")
+	}
+	changed = spec
+	changed.Addresses = append([]NormalizedAddressConfig(nil), spec.Addresses...)
+	changed.Addresses[0].Suffix = netip.MustParseAddr("::54")
+	changedFingerprint := FingerprintDesiredSpec(changed)
+	if artifact.Fingerprint == changedFingerprint {
+		t.Fatal("fingerprint ignored operational address configuration")
+	}
+	if IsCurrent(currentFromDesired(artifact), DesiredArtifact{Spec: changed, Fingerprint: changedFingerprint}) {
+		t.Fatal("address-only configuration change was recognized as current")
 	}
 
 	current := currentFromDesired(artifact)

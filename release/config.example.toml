@@ -21,6 +21,11 @@ name = "vlan20"
 inside_prefix = "fdff:a887:86e4:20::/64"
 subnet_id = 0x20
 
+[[addresses]]
+name = "gateway-c"
+mapping = "vlan20"
+suffix = "::c"
+
 [logging]
 level = "info"
 format = "text"

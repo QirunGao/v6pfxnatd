@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -12,13 +13,17 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-var nftIdentifierPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+var (
+	nftIdentifierPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	statusNamePattern    = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+)
 
 type rawConfig struct {
 	Network         rawNetworkConfig         `toml:"network"`
 	DelegatedPrefix rawDelegatedPrefixConfig `toml:"delegated_prefix"`
 	NFTables        rawNFTablesConfig        `toml:"nftables"`
 	Mappings        []rawMappingConfig       `toml:"mappings"`
+	Addresses       []rawAddressConfig       `toml:"addresses"`
 	Logging         rawLoggingConfig         `toml:"logging"`
 }
 
@@ -44,6 +49,12 @@ type rawMappingConfig struct {
 	SubnetID     uint64 `toml:"subnet_id"`
 }
 
+type rawAddressConfig struct {
+	Name    string `toml:"name"`
+	Mapping string `toml:"mapping"`
+	Suffix  string `toml:"suffix"`
+}
+
 type rawLoggingConfig struct {
 	Level  string `toml:"level"`
 	Format string `toml:"format"`
@@ -61,6 +72,7 @@ type Config struct {
 
 	NFTTableName string
 	Mappings     []MappingConfig
+	Addresses    []AddressConfig
 	Logging      LoggingConfig
 }
 
@@ -68,6 +80,12 @@ type MappingConfig struct {
 	Name         string
 	InsidePrefix netip.Prefix
 	SubnetID     uint64
+}
+
+type AddressConfig struct {
+	Name    string
+	Mapping string
+	Suffix  netip.Addr
 }
 
 type LoggingConfig struct {
@@ -87,6 +105,7 @@ type NormalizedConfig struct {
 
 	NFTTableName string
 	Mappings     []NormalizedMappingConfig
+	Addresses    []NormalizedAddressConfig
 	Logging      LoggingConfig
 }
 
@@ -94,6 +113,12 @@ type NormalizedMappingConfig struct {
 	Name         string
 	InsidePrefix netip.Prefix
 	SubnetID     uint64
+}
+
+type NormalizedAddressConfig struct {
+	Name    string
+	Mapping string
+	Suffix  netip.Addr
 }
 
 func LoadConfig(path string) (NormalizedConfig, error) {
@@ -129,6 +154,18 @@ func parseRawConfig(raw rawConfig) (Config, error) {
 			SubnetID:     item.SubnetID,
 		})
 	}
+	addresses := make([]AddressConfig, 0, len(raw.Addresses))
+	for i, item := range raw.Addresses {
+		suffix, err := netip.ParseAddr(item.Suffix)
+		if err != nil {
+			return Config{}, fmt.Errorf("addresses[%d].suffix: %w", i, err)
+		}
+		addresses = append(addresses, AddressConfig{
+			Name:    item.Name,
+			Mapping: item.Mapping,
+			Suffix:  suffix,
+		})
+	}
 
 	return Config{
 		WANInterface:     raw.Network.WANInterface,
@@ -139,6 +176,7 @@ func parseRawConfig(raw rawConfig) (Config, error) {
 		PDRouteType:      int(raw.DelegatedPrefix.RouteType),
 		NFTTableName:     raw.NFTables.TableName,
 		Mappings:         mappings,
+		Addresses:        addresses,
 		Logging: LoggingConfig{
 			Level:  raw.Logging.Level,
 			Format: raw.Logging.Format,
@@ -184,7 +222,7 @@ func ValidateConfig(cfg Config) error {
 		}
 		names[item.Name] = struct{}{}
 
-		if !item.InsidePrefix.IsValid() || !item.InsidePrefix.Addr().Is6() || item.InsidePrefix.Bits() != 64 || item.InsidePrefix != item.InsidePrefix.Masked() {
+		if !item.InsidePrefix.Addr().Is6() || item.InsidePrefix.Bits() != 64 || item.InsidePrefix != item.InsidePrefix.Masked() {
 			return fmt.Errorf("mappings[%d].inside_prefix must be a masked IPv6 /64", i)
 		}
 		if _, exists := inside[item.InsidePrefix]; exists {
@@ -198,6 +236,27 @@ func ValidateConfig(cfg Config) error {
 		subnets[item.SubnetID] = struct{}{}
 		if !subnetIDFits(item.SubnetID, cfg.PDPrefixLength) {
 			return fmt.Errorf("mappings[%d].subnet_id %#x does not fit in %d bits", i, item.SubnetID, 64-cfg.PDPrefixLength)
+		}
+	}
+
+	addressNames := make(map[string]struct{}, len(cfg.Addresses))
+	for i, item := range cfg.Addresses {
+		if !statusNamePattern.MatchString(item.Name) {
+			return fmt.Errorf("addresses[%d].name %q must match %s", i, item.Name, statusNamePattern)
+		}
+		if _, exists := addressNames[item.Name]; exists {
+			return fmt.Errorf("duplicate address name %q", item.Name)
+		}
+		addressNames[item.Name] = struct{}{}
+		if _, exists := names[item.Mapping]; !exists {
+			return fmt.Errorf("addresses[%d].mapping %q does not name a configured mapping", i, item.Mapping)
+		}
+		if !item.Suffix.Is6() || item.Suffix.Zone() != "" {
+			return fmt.Errorf("addresses[%d].suffix must be an unzoned IPv6 address suffix", i)
+		}
+		bytes := item.Suffix.As16()
+		if binary.BigEndian.Uint64(bytes[:8]) != 0 {
+			return fmt.Errorf("addresses[%d].suffix must contain only the low 64 bits", i)
 		}
 	}
 
@@ -218,6 +277,13 @@ func NormalizeConfig(cfg Config) NormalizedConfig {
 	sort.Slice(mappings, func(i, j int) bool {
 		return mappings[i].InsidePrefix.Addr().Compare(mappings[j].InsidePrefix.Addr()) < 0
 	})
+	addresses := make([]NormalizedAddressConfig, len(cfg.Addresses))
+	for i, item := range cfg.Addresses {
+		addresses[i] = NormalizedAddressConfig(item)
+	}
+	sort.Slice(addresses, func(i, j int) bool {
+		return addresses[i].Name < addresses[j].Name
+	})
 	return NormalizedConfig{
 		WANInterface:     cfg.WANInterface,
 		PolicyRouteTable: cfg.PolicyRouteTable,
@@ -227,6 +293,7 @@ func NormalizeConfig(cfg Config) NormalizedConfig {
 		PDRouteType:      cfg.PDRouteType,
 		NFTTableName:     cfg.NFTTableName,
 		Mappings:         mappings,
+		Addresses:        addresses,
 		Logging:          cfg.Logging,
 	}
 }

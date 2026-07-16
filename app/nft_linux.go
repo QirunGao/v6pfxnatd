@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -39,6 +38,7 @@ func Reconcile(ctx context.Context, cfg NormalizedConfig) error {
 	if IsCurrent(current, desired) {
 		return nil
 	}
+	status := BuildOperationalStatus(cfg, mappings)
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -51,6 +51,9 @@ func Reconcile(ctx context.Context, cfg NormalizedConfig) error {
 	}
 	if err := CommitReplacement(conn); err != nil {
 		return fmt.Errorf("commit nftables replacement: %w", err)
+	}
+	if err := WriteOperationalStatus(operationalStatusPath, status); err != nil {
+		slog.Warn("write operational status failed", "path", operationalStatusPath, "error", err)
 	}
 	slog.Info("nftables table replaced", "table", cfg.NFTTableName, "delegated_prefix", delegatedPrefix)
 	return nil
@@ -138,9 +141,6 @@ func prefixMapDataType() nftables.SetDatatype {
 }
 
 func EncodeMapElements(items []MapElementSpec) []nftables.SetElement {
-	if len(items) == 0 {
-		return nil
-	}
 	encoded := make([]nftables.SetElement, 0, len(items)*2)
 	var zero [16]byte
 	firstKey := items[0].Key.Addr().As16()
@@ -216,30 +216,29 @@ func readManagedSetComments(tableName string) (map[string]string, error) {
 			return nil, err
 		}
 		if table == tableName && (name == dnatMapName || name == snatMapName) {
-			comment, _ := DecodeSetComment(rawUserData)
-			comments[name] = comment
+			comments[name] = DecodeSetComment(rawUserData)
 		}
 	}
 	return comments, nil
 }
 
-func DecodeSetComment(data []byte) (string, error) {
+func DecodeSetComment(data []byte) string {
 	for len(data) != 0 {
 		if len(data) < 2 {
-			return "", errors.New("malformed nftables set userdata")
+			return ""
 		}
 		typeID, length := userdata.Type(data[0]), int(data[1])
 		if len(data) < 2+length {
-			return "", errors.New("malformed nftables set userdata length")
+			return ""
 		}
 		value := data[2 : 2+length]
 		if typeID == userdata.NFTNL_UDATA_SET_COMMENT {
 			value = bytes.TrimSuffix(value, []byte{0})
-			return string(value), nil
+			return string(value)
 		}
 		data = data[2+length:]
 	}
-	return "", nil
+	return ""
 }
 
 func prefixEnd64(start [16]byte) [16]byte {

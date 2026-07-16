@@ -10,7 +10,7 @@ import (
 
 const (
 	defaultConfigPath = "/etc/v6pfxnatd/config.toml"
-	Version           = "0.2.1"
+	Version           = "0.2.2"
 )
 
 type cliOptions struct {

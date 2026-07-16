@@ -12,6 +12,9 @@ RestartSec=5s
 DynamicUser=no
 User=root
 Group=root
+RuntimeDirectory=v6pfxnatd
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
 
 NoNewPrivileges=yes
 ProtectSystem=strict

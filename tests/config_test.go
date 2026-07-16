@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,9 @@ func TestLoadConfigValidatesAndNormalizes(t *testing.T) {
 	}
 	if len(cfg.Mappings) != 2 || cfg.Mappings[0].Name != "vlan10" || cfg.Mappings[1].Name != "vlan20" {
 		t.Fatalf("mappings were not normalized: %+v", cfg.Mappings)
+	}
+	if len(cfg.Addresses) != 2 || cfg.Addresses[0].Name != "dns-53" || cfg.Addresses[1].Name != "gateway-c" {
+		t.Fatalf("addresses were not normalized: %+v", cfg.Addresses)
 	}
 }
 
@@ -54,6 +58,9 @@ func TestValidateConfigRejectsImportantBoundaries(t *testing.T) {
 	for _, item := range cfg.Mappings {
 		base.Mappings = append(base.Mappings, MappingConfig(item))
 	}
+	for _, item := range cfg.Addresses {
+		base.Addresses = append(base.Addresses, AddressConfig(item))
+	}
 
 	tests := []struct {
 		name   string
@@ -64,12 +71,17 @@ func TestValidateConfigRejectsImportantBoundaries(t *testing.T) {
 		{"invalid table", func(c *Config) { c.NFTTableName = "bad table" }, "identifier"},
 		{"duplicate name", func(c *Config) { c.Mappings[1].Name = c.Mappings[0].Name }, "duplicate mapping name"},
 		{"subnet overflow", func(c *Config) { c.Mappings[0].SubnetID = 0x100 }, "does not fit"},
+		{"invalid address name", func(c *Config) { c.Addresses[0].Name = "bad name" }, "must match"},
+		{"duplicate address name", func(c *Config) { c.Addresses[1].Name = c.Addresses[0].Name }, "duplicate address name"},
+		{"unknown address mapping", func(c *Config) { c.Addresses[0].Mapping = "missing" }, "does not name"},
+		{"full address as suffix", func(c *Config) { c.Addresses[0].Suffix = netip.MustParseAddr("fd00::c") }, "low 64 bits"},
 		{"unknown log format", func(c *Config) { c.Logging.Format = "yaml" }, "logging.format"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			candidate := base
 			candidate.Mappings = append([]MappingConfig(nil), base.Mappings...)
+			candidate.Addresses = append([]AddressConfig(nil), base.Addresses...)
 			test.mutate(&candidate)
 			if err := ValidateConfig(candidate); err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("error = %v, want %q", err, test.want)
@@ -114,6 +126,16 @@ route_type = 7
 [nftables]
 table_name = "v6pfxnat_wan1"
 ` + firstMapping + secondMapping + `
+[[addresses]]
+name = "gateway-c"
+mapping = "vlan20"
+suffix = "::c"
+
+[[addresses]]
+name = "dns-53"
+mapping = "vlan10"
+suffix = "::53"
+
 [logging]
 level = "info"
 format = "text"

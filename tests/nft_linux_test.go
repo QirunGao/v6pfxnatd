@@ -129,15 +129,12 @@ func TestIntervalMapElementEncodingAtFinalPrefix(t *testing.T) {
 func TestDecodeSetComment(t *testing.T) {
 	data := userdata.AppendUint32(nil, userdata.NFTNL_UDATA_SET_KEYBYTEORDER, 2)
 	data = userdata.AppendString(data, userdata.NFTNL_UDATA_SET_COMMENT, "v6pfxnatd:test")
-	comment, err := DecodeSetComment(data)
-	if err != nil {
-		t.Fatal(err)
-	}
+	comment := DecodeSetComment(data)
 	if comment != "v6pfxnatd:test" {
 		t.Fatalf("comment = %q", comment)
 	}
-	if _, err := DecodeSetComment([]byte{byte(userdata.NFTNL_UDATA_SET_COMMENT), 10, 'x'}); err == nil {
-		t.Fatal("malformed userdata accepted")
+	if comment := DecodeSetComment([]byte{byte(userdata.NFTNL_UDATA_SET_COMMENT), 10, 'x'}); comment != "" {
+		t.Fatalf("malformed userdata comment = %q", comment)
 	}
 }
 

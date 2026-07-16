@@ -23,9 +23,6 @@ builds:
     flags:
       - -trimpath
       - -buildvcs=false
-    tags:
-      - osusergo
-      - netgo
     ldflags:
       - -s -w -buildid=
     mod_timestamp: "{{ .CommitTimestamp }}"
@@ -81,11 +78,6 @@ nfpms:
       - src: ./release/v6pfxnatd.service
         dst: /usr/lib/systemd/system/v6pfxnatd.service
         packager: rpm
-        file_info:
-          mode: 0644
-
-      - src: ./release/v6pfxnatd.conf
-        dst: /etc/modules-load.d/v6pfxnatd.conf
         file_info:
           mode: 0644
 

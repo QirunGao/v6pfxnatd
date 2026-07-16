@@ -36,10 +36,11 @@ type DesiredSpec struct {
 	WANInterface    string
 	DelegatedPrefix netip.Prefix
 
-	Chains   []ChainSpec
-	Maps     []MapSpec
-	Rules    []RuleSpec
-	Mappings []PrefixMapping
+	Chains    []ChainSpec
+	Maps      []MapSpec
+	Rules     []RuleSpec
+	Mappings  []PrefixMapping
+	Addresses []NormalizedAddressConfig
 }
 
 type ChainSpec struct {
@@ -113,8 +114,6 @@ func BuildDesiredSpec(cfg NormalizedConfig, delegatedPrefix netip.Prefix, mappin
 		snatElements = append(snatElements, MapElementSpec{Key: mapping.Inside, Value: mapping.Outside})
 	}
 	SortMapElements(dnatElements)
-	SortMapElements(snatElements)
-
 	return DesiredSpec{
 		Family:          managedFamily,
 		TableName:       cfg.NFTTableName,
@@ -132,7 +131,8 @@ func BuildDesiredSpec(cfg NormalizedConfig, delegatedPrefix netip.Prefix, mappin
 			{Chain: preroutingChainName, InterfaceKey: "iifname", InterfaceName: cfg.WANInterface, MapName: dnatMapName, AddressOffset: 24, NATType: "dnat"},
 			{Chain: postroutingChainName, InterfaceKey: "oifname", InterfaceName: cfg.WANInterface, MapName: snatMapName, AddressOffset: 8, NATType: "snat"},
 		},
-		Mappings: mappings,
+		Mappings:  mappings,
+		Addresses: cfg.Addresses,
 	}
 }
 
@@ -178,6 +178,12 @@ func FingerprintDesiredSpec(desired DesiredSpec) [32]byte {
 		writeString(&buffer, mapping.Inside.String())
 		writeString(&buffer, mapping.Outside.String())
 		writeUint64(&buffer, mapping.SubnetID)
+	}
+	writeUint32(&buffer, uint32(len(desired.Addresses)))
+	for _, address := range desired.Addresses {
+		writeString(&buffer, address.Name)
+		writeString(&buffer, address.Mapping)
+		writeString(&buffer, address.Suffix.String())
 	}
 	return sha256.Sum256(buffer.Bytes())
 }

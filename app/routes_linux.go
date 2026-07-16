@@ -87,7 +87,7 @@ func ReadNetworkSnapshot(cfg NormalizedConfig) (NetworkSnapshot, error) {
 	}
 	foundDefault := false
 	for _, route := range defaultRoutes {
-		if route.Family == unix.AF_INET6 && route.Table == cfg.PolicyRouteTable && route.LinkIndex == wanIfIndex && isDefaultRouteDestination(route.Dst) {
+		if route.LinkIndex == wanIfIndex && isDefaultRouteDestination(route.Dst) {
 			foundDefault = true
 			break
 		}
@@ -102,13 +102,10 @@ func ReadNetworkSnapshot(cfg NormalizedConfig) (NetworkSnapshot, error) {
 	}
 	candidates := make([]netip.Prefix, 0)
 	for _, route := range pdRoutes {
-		if route.Family != unix.AF_INET6 || route.Table != cfg.PDRouteTable || int(route.Protocol) != cfg.PDRouteProtocol || route.Type != cfg.PDRouteType || route.Dst == nil || prefixLength(route.Dst) != cfg.PDPrefixLength {
+		if int(route.Protocol) != cfg.PDRouteProtocol || route.Type != cfg.PDRouteType || route.Dst == nil || prefixLength(route.Dst) != cfg.PDPrefixLength {
 			continue
 		}
 		candidates = append(candidates, prefixFromIPNet(route.Dst))
-	}
-	if len(candidates) == 0 {
-		return NetworkSnapshot{}, errors.New("delegated-prefix route not found")
 	}
 	return NetworkSnapshot{PDCandidates: candidates}, nil
 }
@@ -122,9 +119,6 @@ func isDefaultRouteDestination(dst *net.IPNet) bool {
 }
 
 func prefixLength(network *net.IPNet) int {
-	if network == nil {
-		return -1
-	}
 	ones, _ := network.Mask.Size()
 	return ones
 }
